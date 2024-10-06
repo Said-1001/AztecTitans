@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo de Astronautas</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            transition: background-color 0.5s;
+        }
+        .light-theme {
+            background-color: white;
+            color: black; /* Color de texto en modo claro */
+        }
+        .dark-theme {
+            background-color: #121212; /* Solo se cambia el fondo */
+            /* color: white; No se aplica color a las letras */
+        }
+        #login-section, #register-section, #dashboard {
+            margin-top: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="light-theme">
+    <div id="login-section">
+        <h2>Iniciar Sesión</h2>
+        <input type="text" id="username" placeholder="Usuario" required>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button onclick="login()">Iniciar Sesión</button>
+        <p id="login-error" style="color: red;"></p>
+        <button onclick="showRegister()">Registrar Cuenta</button>
+    </div>
+
+    <div id="register-section" class="hidden">
+        <h2>Registrar Cuenta</h2>
+        <input type="text" id="new-username" placeholder="Nuevo Usuario" required>
+        <input type="password" id="new-password" placeholder="Nueva Contraseña" required>
+        <button onclick="register()">Registrar</button>
+        <p id="register-error" style="color: red;"></p>
+        <button onclick="goBackToLogin()">Regresar a Iniciar Sesión</button>
+    </div>
+
+    <div id="dashboard" class="hidden">
+        <h2>Bienvenido al Monitoreo de Astronautas</h2>
+        <button onclick="showHistory()">Mostrar Historial Semanal</button>
+        <button onclick="showFeelings()">Mostrar Estado de Ánimo</button>
+        <button onclick="showPulseChart()">Mostrar Gráfico de Pulsaciones</button>
+        <button onclick="logout()">Cerrar Sesión</button>
+        <button id="themeToggle" onclick="toggleTheme()">Cambiar a Modo Oscuro</button>
+
+        <div id="history" class="hidden">
+            <h3>Historial Semanal</h3>
+            <ul id="history-list"></ul>
+            <button onclick="goBack()">Regresar</button>
+        </div>
+
+        <div id="feelings" class="hidden">
+            <h3>Estado de Ánimo</h3>
+            <ul id="feelings-list"></ul>
+            <button onclick="goBack()">Regresar</button>
+        </div>
+
+        <div id="pulse-chart" class="hidden">
+            <h3>Gráfico de Pulsaciones en Tiempo Real</h3>
+            <canvas id="myChart" width="400" height="200"></canvas>
+            <button onclick="goBack()">Regresar</button>
+        </div>
+    </div>
+
+    <script>
+        let loggedIn = false;
+        let username = '';
+        let users = [];
+        let myChart;
+        let chartInterval;
+
+        const weeklyData = [
+            { day: "Lunes", heartRate: 72, temperature: 36.5, oxygen: 98, mood: "Relajado" },
+            { day: "Martes", heartRate: 85, temperature: 37, oxygen: 95, mood: "Estrés" },
+            { day: "Miércoles", heartRate: 75, temperature: 36.8, oxygen: 97, mood: "Normal" },
+            { day: "Jueves", heartRate: 90, temperature: 37.5, oxygen: 92, mood: "Estrés" },
+            { day: "Viernes", heartRate: 70, temperature: 36.7, oxygen: 96, mood: "Relajado" },
+            { day: "Sábado", heartRate: 80, temperature: 36.9, oxygen: 94, mood: "Normal" },
+            { day: "Domingo", heartRate: 78, temperature: 36.6, oxygen: 97, mood: "Relajado" }
+        ];
+
+        function login() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const foundUser = users.find(u => u.username === user && u.password === pass);
+            if (foundUser) {
+                loggedIn = true;
+                username = user;
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+            } else {
+                document.getElementById('login-error').innerText = "Usuario o contraseña incorrectos.";
+            }
+        }
+
+        function showRegister() {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('register-section').style.display = 'block';
+        }
+
+        function register() {
+            const newUser = document.getElementById('new-username').value;
+            const newPass = document.getElementById('new-password').value;
+
+            if (users.some(u => u.username === newUser)) {
+                document.getElementById('register-error').innerText = "El usuario ya existe.";
+            } else {
+                users.push({ username: newUser, password: newPass });
+                document.getElementById('register-error').innerText = "Cuenta registrada con éxito.";
+                setTimeout(() => {
+                    goBackToLogin();
+                }, 2000);
+            }
+        }
+
+        function goBackToLogin() {
+            document.getElementById('register-section').style.display = 'none';
+            document.getElementById('login-section').style.display = 'block';
+        }
+
+        function showHistory() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            weeklyData.forEach(data => {
+                const li = document.createElement('li');
+                li.innerText = `${data.day}: FC: ${data.heartRate}, Temp: ${data.temperature}°C, O2: ${data.oxygen}%, Estado de ánimo: ${data.mood}`;
+                historyList.appendChild(li);
+            });
+            document.getElementById('history').style.display = 'block';
+        }
+
+        function showFeelings() {
+            const feelingsList = document.getElementById('feelings-list');
+            feelingsList.innerHTML = '';
+            weeklyData.forEach(data => {
+                const li = document.createElement('li');
+                li.innerText = `${data.day}: ${data.mood}`;
+                feelingsList.appendChild(li);
+            });
+            document.getElementById('feelings').style.display = 'block';
+        }
+
+        function showPulseChart() {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            const labels = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            const data = {
+                labels: labels,
+                datasets: [{
+                    label: 'Frecuencia Cardíaca',
+                    data: weeklyData.map(data => data.heartRate),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderWidth: 2
+                }]
+            };
+
+            if (!myChart) {
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Frecuencia Cardíaca (lpm)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Días'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            document.getElementById('pulse-chart').style.display = 'block';
+
+            // Iniciar actualización continua de datos en tiempo real
+            chartInterval = setInterval(() => {
+                const newRate = Math.floor(Math.random() * (100 - 60 + 1)) + 60;
+                myChart.data.datasets[0].data.shift();
+                myChart.data.datasets[0].data.push(newRate);
+                myChart.update();
+            }, 1000);
+        }
+
+        function logout() {
+            loggedIn = false;
+            username = '';
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function goBack() {
+            document.getElementById('history').style.display = 'none';
+            document.getElementById('feelings').style.display = 'none';
+            document.getElementById('pulse-chart').style.display = 'none';
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            if (body.classList.contains('light-theme')) {
+                body.classList.remove('light-theme');
+                body.classList.add('dark-theme');
+                document.getElementById('themeToggle').innerText = 'Cambiar a Modo Claro';
+            } else {
+                body.classList.remove('dark-theme');
+                body.classList.add('light-theme');
+                document.getElementById('themeToggle').innerText = 'Cambiar a Modo Oscuro';
+            }
+        }
+    </script>
+</body>
+</html>
