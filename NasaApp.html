@@ -15,17 +15,33 @@
         }
         .light-theme {
             background-color: white;
-            color: black; /* Color de texto en modo claro */
+            color: black;
         }
         .dark-theme {
-            background-color: #121212; /* Solo se cambia el fondo */
-            /* color: white; No se aplica color a las letras */
+            background-color: #121212;
         }
         #login-section, #register-section, #dashboard {
             margin-top: 20px;
         }
         .hidden {
             display: none;
+        }
+        .danger {
+            color: red;
+        }
+        .normal {
+            color: green;
+        }
+        .low {
+            color: yellow;
+        }
+        #averageHeartRate {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .danger-symbol {
+            margin-left: 10px;
+            color: red;
         }
     </style>
 </head>
@@ -71,6 +87,10 @@
         <div id="pulse-chart" class="hidden">
             <h3>Gráfico de Pulsaciones en Tiempo Real</h3>
             <canvas id="myChart" width="400" height="200"></canvas>
+            <div>
+                <p>Frecuencia Cardíaca Promedio: <span id="averageHeartRate">0</span> bpm <span id="dangerSymbol" class="danger-symbol hidden">⚠️</span></p>
+            </div>
+            <button onclick="resetChart()">Reiniciar Gráfica</button>
             <button onclick="goBack()">Regresar</button>
         </div>
     </div>
@@ -81,6 +101,8 @@
         let users = [];
         let myChart;
         let chartInterval;
+        let heartRates = []; // Para almacenar las pulsaciones
+        let chartLabels = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
         const weeklyData = [
             { day: "Lunes", heartRate: 72, temperature: 36.5, oxygen: 98, mood: "Relajado" },
@@ -155,9 +177,8 @@
 
         function showPulseChart() {
             const ctx = document.getElementById('myChart').getContext('2d');
-            const labels = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
             const data = {
-                labels: labels,
+                labels: chartLabels,
                 datasets: [{
                     label: 'Frecuencia Cardíaca',
                     data: weeklyData.map(data => data.heartRate),
@@ -196,24 +217,68 @@
 
             // Iniciar actualización continua de datos en tiempo real
             chartInterval = setInterval(() => {
-                const newRate = Math.floor(Math.random() * (100 - 60 + 1)) + 60;
-                myChart.data.datasets[0].data.shift();
-                myChart.data.datasets[0].data.push(newRate);
+                const newRate = Math.floor(Math.random() * (120 - 40 + 1)) + 40; // Generar un nuevo valor aleatorio entre 40 y 120
+                heartRates.push(newRate); // Agregar el nuevo valor a la lista
+
+                // Actualizar gráfico
+                myChart.data.labels.push('Nuevo');
+                myChart.data.datasets[0].data.push(newRate); // Agregar al gráfico
                 myChart.update();
+
+                // Calcular promedio
+                const sum = heartRates.reduce((a, b) => a + b, 0);
+                const avg = (sum / heartRates.length) || 0;
+                document.getElementById('averageHeartRate').innerText = avg.toFixed(2);
+
+                // Actualizar color y símbolo de peligro
+                updateHeartRateDisplay(newRate);
             }, 1000);
         }
 
-        function logout() {
-            loggedIn = false;
-            username = '';
-            document.getElementById('login-section').style.display = 'block';
-            document.getElementById('dashboard').style.display = 'none';
+        function resetChart() {
+            // Reiniciar la gráfica y el historial de datos
+            heartRates = [];
+            myChart.data.labels = [];
+            myChart.data.datasets[0].data = [];
+            myChart.update();
+            document.getElementById('averageHeartRate').innerText = '0';
+            document.getElementById('dangerSymbol').classList.add('hidden');
+        }
+
+        function updateHeartRateDisplay(rate) {
+            const averageHeartRate = document.getElementById('averageHeartRate');
+            const dangerSymbol = document.getElementById('dangerSymbol');
+            dangerSymbol.classList.add('hidden'); // Ocultar por defecto
+
+            if (rate < 60) {
+                averageHeartRate.className = 'low';
+                averageHeartRate.innerText = rate + ' bpm ⚠️'; // Agregar símbolo de peligro
+                dangerSymbol.classList.remove('hidden'); // Mostrar símbolo de peligro
+            } else if (rate >= 60 && rate <= 100) {
+                averageHeartRate.className = 'normal';
+                averageHeartRate.innerText = rate + ' bpm';
+            } else if (rate > 100 && rate <= 120) {
+                averageHeartRate.className = 'normal';
+                averageHeartRate.innerText = rate + ' bpm';
+            } else {
+                averageHeartRate.className = 'danger';
+                averageHeartRate.innerText = rate + ' bpm ⚠️'; // Agregar símbolo de peligro
+                dangerSymbol.classList.remove('hidden'); // Mostrar símbolo de peligro
+            }
         }
 
         function goBack() {
             document.getElementById('history').style.display = 'none';
             document.getElementById('feelings').style.display = 'none';
             document.getElementById('pulse-chart').style.display = 'none';
+            clearInterval(chartInterval); // Detener el intervalo cuando se regresa
+        }
+
+        function logout() {
+            loggedIn = false;
+            username = '';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('login-section').style.display = 'block';
         }
 
         function toggleTheme() {
