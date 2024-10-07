@@ -1,0 +1,277 @@
+#define NOTE_D4 294
+#define NOTE_E4 330
+#define NOTE_G4 392
+#define NOTE_A4 440 
+#define NOTE_C5 523
+#define NOTE_FAIL 100 // Frecuencia para el sonido de fallo
+
+#define CHOICE_OFF     0 
+#define CHOICE_NONE    0 
+
+#define CHOICE_RED    (1 << 0)
+#define CHOICE_GREEN  (1 << 1)
+#define CHOICE_BLUE   (1 << 2)
+#define CHOICE_YELLOW (1 << 3)
+#define CHOICE_ExtraLed (1 << 4)
+
+const int redLED = 2;
+const int blueLED = 3;
+const int yellowLED = 4;
+const int greenLED = 5;
+const int extraLED = 13; // LED adicional normal
+
+const int buzzer = 10;    // Buzzer
+
+const int extraButton = 11; // Botón para el LED adicional
+const int redButton = 6;
+const int blueButton = 7;
+const int yellowButton = 8;
+const int greenButton = 9;
+
+#define ROUNDS_TO_WIN    30 // Aumentar el número de rondas necesarias para ganar
+#define ENTRY_TIME_LIMIT 3000 // Reducir el tiempo de espera para elegir un botón
+
+enum GameMode { MEMORY, BATTLE, BEEGEES }; // Usar un enum para los modos de juego
+GameMode gameMode = MEMORY;
+
+byte gameBoard[32];
+byte gameRound = 0;
+
+const int LED_ON_DELAY = 500; // Tiempo en milisegundos para encender LEDs
+const int BUTTON_CHECK_DELAY = 100; // Tiempo en milisegundos entre revisiones de botones
+
+// Declaración de ledPins
+const int ledPins[] = {redLED, greenLED, blueLED, yellowLED, extraLED};
+
+// Declaración de la función play_beegees
+void play_beegees(); 
+
+//--------------------------------------------------------------
+void setup() {
+    pinMode(redLED, OUTPUT);
+    pinMode(blueLED, OUTPUT);
+    pinMode(yellowLED, OUTPUT);
+    pinMode(greenLED, OUTPUT);
+    pinMode(extraLED, OUTPUT); // Configura el LED adicional como salida
+    
+    pinMode(buzzer, OUTPUT);    // Configura el buzzer como salida
+
+    pinMode(redButton, INPUT_PULLUP);
+    pinMode(blueButton, INPUT_PULLUP);
+    pinMode(yellowButton, INPUT_PULLUP);
+    pinMode(greenButton, INPUT_PULLUP);
+    pinMode(extraButton, INPUT_PULLUP); // Configura el botón para el LED adicional
+
+    digitalWrite(blueLED, HIGH); 
+    digitalWrite(redLED, HIGH); 
+    digitalWrite(extraLED, HIGH);
+    digitalWrite(greenLED, HIGH); 
+    digitalWrite(yellowLED, HIGH); 
+
+    delay(2500);  
+
+    digitalWrite(blueLED, LOW); 
+    digitalWrite(redLED, LOW); 
+    digitalWrite(extraLED, LOW);
+    digitalWrite(greenLED, LOW); 
+    digitalWrite(yellowLED, LOW); 
+
+    if (checkButton() == CHOICE_YELLOW) play_beegees();
+    if (checkButton() == CHOICE_GREEN) {
+        gameMode = BATTLE; 
+        setLEDs(CHOICE_GREEN);
+        buzz_sound(CHOICE_GREEN, 150);
+        setLEDs(CHOICE_RED | CHOICE_BLUE | CHOICE_YELLOW | CHOICE_ExtraLed); 
+        while (checkButton() != CHOICE_NONE); 
+    }
+    play_winner();
+}
+
+//--------------------------------------------------------------
+void loop() {
+    attractMode();
+    setLEDs(CHOICE_RED | CHOICE_GREEN | CHOICE_BLUE | CHOICE_YELLOW | CHOICE_ExtraLed);
+    delay(1000); 
+    
+    setLEDs(CHOICE_OFF); 
+    delay(1000);
+  
+    if (gameMode == MEMORY) {
+        if (play_memory() == true) play_winner(); 
+        else play_loser();
+    } else if (gameMode == BATTLE) { 
+        play_battle(); 
+        play_loser(); 
+    }
+}
+
+//--------------------------------------------------------------
+boolean play_memory(void) {
+    randomSeed(millis());  
+    gameRound = 0;
+  
+    while (gameRound < ROUNDS_TO_WIN) {
+        add_to_moves();  
+        playMoves();
+        for (byte currentMove = 0; currentMove < gameRound; currentMove++) {
+            byte choice = wait_for_button();
+            if (choice == 0) return false;
+            if (choice != gameBoard[currentMove]) return false;
+        }
+        delay(1000); // Mantener un breve retraso después de cada ronda
+    }
+    return true;
+}
+
+//--------------------------------------------------------------
+boolean play_battle(void) {
+    gameRound = 0;
+    while (1) {
+        byte newButton = wait_for_button();
+        gameBoard[gameRound++] = newButton;
+        
+        for (byte currentMove = 0; currentMove < gameRound; currentMove++) {
+            byte choice = wait_for_button();
+            if (choice == 0) return false;
+            if (choice != gameBoard[currentMove]) return false;
+        }
+        delay(1000);
+    }
+    return true; 
+}
+
+//--------------------------------------------------------------
+void playMoves(void) {
+    for (byte currentMove = 0; currentMove < gameRound; currentMove++) { 
+        buzz(gameBoard[currentMove], 500); 
+        delay(LED_ON_DELAY); 
+    }
+}
+
+//--------------------------------------------------------------
+void add_to_moves(void) {
+    byte newButton = random(0, 5); // Cambiado de 5 a 4 para incluir CHOICE_ExtraLed
+    if (newButton == 0) newButton = CHOICE_RED;
+    else if (newButton == 1) newButton = CHOICE_GREEN;
+    else if (newButton == 2) newButton = CHOICE_BLUE;
+    else if (newButton == 3) newButton = CHOICE_YELLOW;
+    else if (newButton == 4) newButton = CHOICE_ExtraLed; // Eliminado para que no se repita.
+    
+    gameBoard[gameRound++] = newButton; 
+}
+
+//--------------------------------------------------------------
+void setLEDs(byte leds) {
+    for (int i = 0; i < 5; i++) {
+        digitalWrite(ledPins[i], (leds & (1 << i)) ? HIGH : LOW);
+    }
+}
+
+//--------------------------------------------------------------
+byte wait_for_button(void) {
+    long startTime = millis();
+    while ((millis() - startTime) < ENTRY_TIME_LIMIT) {
+        byte button = checkButton();
+        if (button != CHOICE_NONE) { 
+            buzz(button, 150);
+            while (checkButton() != CHOICE_NONE); 
+            delay(BUTTON_CHECK_DELAY);
+            return button;
+        }
+    }
+    return CHOICE_NONE;
+}
+
+//--------------------------------------------------------------
+byte checkButton(void) {
+    if (digitalRead(redButton) == 0) return (CHOICE_RED); 
+    else if (digitalRead(greenButton) == 0) return (CHOICE_GREEN); 
+    else if (digitalRead(blueButton) == 0) return (CHOICE_BLUE); 
+    else if (digitalRead(yellowButton) == 0) return (CHOICE_YELLOW);
+    else if (digitalRead(extraButton) == 0) return (CHOICE_ExtraLed);
+    return (CHOICE_NONE);
+}
+
+//--------------------------------------------------------------
+void buzz(byte which, int buzz_length_ms) {
+    setLEDs(which);
+    switch (which) {
+        case CHOICE_RED:
+            buzz_sound(buzz_length_ms, 1136); 
+            break;
+        case CHOICE_GREEN:
+            buzz_sound(buzz_length_ms, 568); 
+            break;
+        case CHOICE_BLUE:
+            buzz_sound(buzz_length_ms, 851); 
+            break;
+        case CHOICE_YELLOW:
+            buzz_sound(buzz_length_ms, 638); 
+            break;
+        case CHOICE_ExtraLed:
+            buzz_sound(buzz_length_ms, 325);
+            break;    
+    }
+    delay(LED_ON_DELAY); 
+    setLEDs(CHOICE_OFF);
+}
+
+//--------------------------------------------------------------
+void buzz_sound(int buzz_length_ms, int buzz_delay_us) {
+    long buzz_length_us = buzz_length_ms * 1000; // Convertir a microsegundos
+    long duration = buzz_length_us / buzz_delay_us; // Calcular duración de los pulsos
+    for (long i = 0; i < duration; i++) {
+        digitalWrite(buzzer, HIGH);
+        delayMicroseconds(buzz_delay_us);
+        digitalWrite(buzzer, LOW);
+        delayMicroseconds(buzz_delay_us);
+    }
+}
+
+//--------------------------------------------------------------
+void play_loser(void) {
+    for (byte i = 0; i < 3; i++) {
+        tone(buzzer, NOTE_FAIL); 
+        delay(100); 
+        noTone(buzzer); 
+        delay(100); 
+    }
+    delay(2000); 
+}
+
+//--------------------------------------------------------------
+void play_winner(void) {
+    for (byte i = 0; i < 3; i++) {
+        tone(buzzer, NOTE_C5); 
+        delay(200); 
+        noTone(buzzer); 
+        delay(100); 
+    }
+}
+
+//--------------------------------------------------------------
+void attractMode(void) {
+    setLEDs(CHOICE_RED | CHOICE_BLUE | CHOICE_GREEN | CHOICE_YELLOW | CHOICE_ExtraLed); 
+    delay(500); 
+    setLEDs(CHOICE_OFF); 
+    delay(500); 
+}
+
+//--------------------------------------------------------------
+void play_beegees(void) {
+    tone(buzzer, NOTE_E4); 
+    delay(200); 
+    noTone(buzzer);
+    delay(100);
+    
+    tone(buzzer, NOTE_G4); 
+    delay(200); 
+    noTone(buzzer);
+    delay(100);
+    
+    tone(buzzer, NOTE_A4); 
+    delay(200); 
+    noTone(buzzer);
+    delay(100);
+  
+}
